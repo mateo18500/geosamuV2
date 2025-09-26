@@ -50,28 +50,45 @@
     @media (max-width:900px){.grid{grid-template-columns:1fr}}
 
     /* Statuts visibles */
-    /* Statuts super lisibles */
-.status{
-  padding:6px 10px;border-radius:999px;font-size:13px;font-weight:600;letter-spacing:.2px;
-  border:1px solid #334155;display:inline-flex;gap:8px;align-items:center
-}
-.status .dot{width:10px;height:10px;border-radius:999px;background:#64748b;display:inline-block}
-.status.NEW{background:#07242a;border-color:#0e7490;color:#a5f3fc}
-.status.ACK{background:#07261e;border-color:#047857;color:#bbf7d0}
-.status.RUN{background:#2b1c0e;border-color:#b45309;color:#ffedd5}
-.status.DONE{background:#0f2412;border-color:#166534;color:#bbf7d0}
-.status.MISSION{background:#10172a;border-color:#334155;color:#e5e7eb}
-.status.MISSION.RUN .dot{background:#f59e0b}
-.status.MISSION.DONE .dot{background:#22c55e}
-
-/* Carte statuts rapides collante en haut */
-.stickyTop{position:sticky;top:8px;z-index:5}
+    .status{padding:4px 8px;border-radius:999px;font-size:12px;border:1px solid #334155; display:inline-flex; gap:6px; align-items:center}
+    .status .dot{width:8px;height:8px;border-radius:999px;background:#64748b;display:inline-block}
+    .status.NEW .dot{background:#22d3ee}
+    .status.ACK .dot{background:#34d399}
+    .status.RUN .dot{background:#f59e0b}
+    .status.DONE .dot{background:#22c55e}
+    .status.BADGE{background:#0b1324}
 
     /* Autocomplete adresse */
     .ac-wrap{position:relative}
     .ac-list{position:absolute;inset:auto 0 0 0; transform:translateY(102%); background:#0e1627;border:1px solid #2b3a57; border-radius:12px; padding:6px; display:none; z-index:50; max-height:220px; overflow:auto}
     .ac-item{padding:8px;border-radius:8px;cursor:pointer}
     .ac-item:hover{background:#14213d}
+      /* —— Mode compact mobile —— */
+    :root{ --card-pad:14px }
+    @media (max-width:640px){
+      :root{ --card-pad:12px }
+      .card .content{ padding:var(--card-pad) }
+      .item{ padding:var(--card-pad) }
+      .pill{ display:none } /* allège l'en-tête sur mobile */
+      .muted{ font-size:11px }
+      .right{ display:none } /* actions lourdes cachées dans un menu */
+      .actions-row{ display:flex; gap:8px; margin-top:10px }
+      .btn{ padding:9px 10px; border-radius:10px }
+      .status{ font-size:12px; padding:5px 9px }
+    }
+      /* —— Mode compact mobile —— */
+    :root{ --card-pad:14px }
+    @media (max-width:640px){
+      :root{ --card-pad:12px }
+      .card .content{ padding:var(--card-pad) }
+      .item{ padding:var(--card-pad) }
+      .pill{ display:none }
+      .muted{ font-size:11px }
+      .right{ display:none }
+      .actions-row{ display:flex; gap:8px; margin-top:10px }
+      .btn{ padding:9px 10px; border-radius:10px }
+      .status{ font-size:12px; padding:5px 9px }
+    }
   </style>
 </head>
 <body>
@@ -165,23 +182,11 @@
     <section id="tab-team" class="tabpane" hidden>
       <div class="grid">
         <div class="card">
-<div class="card stickyTop">
-  <h3>Statut rapide (équipe)</h3>
-  <div class="content">
-    <div class="row">
-      <button class="btn success" data-quick-status="EN_ROUTE">En route</button>
-      <button class="btn warn" data-quick-status="SUR_PLACE">Sur place</button>
-      <button class="btn" data-quick-status="TRANSPORT">Transport</button>
-      <button class="btn" data-quick-status="DISPONIBLE">Disponible</button>
-    </div>
-    <p class="hint" style="margin-top:8px">Met à jour le <b>statut d’équipe</b> sur la dernière alerte active.</p>
-  </div>
-</div>
-
-<div class="card">
           <h3>Alertes reçues (<span id="teamNameLabel">SMUR 1</span>)</h3>
           <div class="content">
             <div id="alerts" class="list"></div>
+            <div class="hint" style="margin-top:6px">Astuce mobile : touchez une alerte pour déplier les détails et les actions.</div>
+            <div class="hint" style="margin-top:6px">Astuce mobile : touchez une alerte pour déplier les détails et les actions.</div>
             <div id="alerts-empty" class="empty" style="display:none">Pas d'alerte. L'écran se met à jour automatiquement.</div>
           </div>
         </div>
@@ -219,8 +224,8 @@
     <p class="footer">© 2025 – Mini app pédagogique. Aucune donnée de santé. Adapté au SAMU / CRRA pour tests internes.</p>
   </div>
 
- <!-- ===================== FIREBASE + APP ===================== -->
-<script type="module">
+  <!-- ===================== FIREBASE + APP ===================== -->
+ <script type="module">
   /* ========= CONFIG ========= */
   const FIREBASE_CONFIG = {
     apiKey: "AIzaSyAi0YZBqDaVngJRILRDwF9FXNdrUkw8UBs",
@@ -370,30 +375,51 @@
   }
 
   function renderAlert(id,a){
-    let cls='NEW'; if(a.status==='ACCUSEE')cls='ACK'; else if(a.status==='EN_COURS')cls='RUN'; else if(a.status==='TERMINEE')cls='DONE';
-    const aStatus = el('span',{className:'status '+cls},[ el('span',{className:'dot'}), document.createTextNode(a.status.replace('_',' ')) ]);
-    const box=el('div',{className:'item'});
-    const header=el('div',{className:'top'},[
-      el('div',{},[
-        el('strong',{textContent:a.title+' '}), el('span',{className:'pill '+prioTag(a.prio),textContent:'P'+a.prio}),
-        aStatus, a.teamStatus? el('span',{className:'pill',style:'margin-left:6px',textContent:'Équipe: '+a.teamStatus.replace('_',' ')}):null,
-        el('span',{className:'muted',style:'margin-left:8px',textContent:fmtTime(a.createdAt)})
-      ].filter(Boolean)),
-      el('div',{className:'right'},[
-        el('button',{className:'btn success',textContent:'Accuser',onclick:()=>ackAlert(id)}),
-        el('button',{className:'btn warn',textContent:'En cours',onclick:()=>setAlertStatus(id,'EN_COURS')}),
-        el('button',{className:'btn',textContent:'Terminer',onclick:()=>setAlertStatus(id,'TERMINEE')})
-      ])
-    ]);
-    const body=el('div',{},[
-      el('div',{className:'muted',textContent:a.addr||'— adresse —'}),
-      el('div',{className:'muted',style:'margin-top:6px',textContent:a.notes||'—'}),
-      el('div',{className:'muted',style:'margin-top:6px',textContent:'Équipe : '+a.team}),
-      a.ackAt? el('div',{className:'muted',style:'margin-top:6px',textContent:'Accusé à '+fmtTime(a.ackAt)}):null
-    ].filter(Boolean));
-    box.append(header, el('div',{className:'divider'}), body);
-    return box;
-  }
+  let cls='NEW'; if(a.status==='ACCUSEE')cls='ACK'; else if(a.status==='EN_COURS')cls='RUN'; else if(a.status==='TERMINEE')cls='DONE';
+  const aStatus = el('span',{className:'status '+cls},[ el('span',{className:'dot'}), document.createTextNode(a.status.replace('_',' ')) ]);
+  const box=el('div',{className:'item'});
+
+  const leftBits = [
+    el('strong',{textContent:a.title+' '}), 
+    el('span',{className:'pill '+prioTag(a.prio),textContent:'P'+a.prio}),
+    aStatus, 
+    a.teamStatus? el('span',{className:'pill',style:'margin-left:6px',textContent:'Équipe: '+a.teamStatus.replace('_',' ')}):null,
+    el('span',{className:'muted',style:'margin-left:8px',textContent:fmtTime(a.createdAt)})
+  ].filter(Boolean);
+
+  // bouton croix
+  const deleteBtn = el('button',{
+    className:'btn danger',
+    style:'padding:2px 6px; font-size:12px; margin-left:8px;',
+    textContent:'❌',
+    onclick:(e)=>{
+      e.stopPropagation();
+      if(confirm('Supprimer cette alerte ?')) set(ref(db,'alerts/'+id), null);
+    }
+  });
+
+  const header=el('div',{className:'top',style:'cursor:pointer; display:flex; justify-content:space-between; align-items:center;'},[
+    el('div',{},leftBits),
+    deleteBtn
+  ]);
+
+  const details = el('div',{style:'display:none; margin-top:8px'},[
+    el('div',{className:'muted',textContent:a.addr||'— adresse —'}),
+    el('div',{className:'muted',style:'margin-top:6px',textContent:a.notes||'—'}),
+    el('div',{className:'muted',style:'margin-top:6px',textContent:'Équipe : '+a.team}),
+    a.ackAt? el('div',{className:'muted',style:'margin-top:6px',textContent:'Accusé à '+fmtTime(a.ackAt)}):null,
+    el('div',{className:'actions-row'},[
+      el('button',{className:'btn success', textContent:'Accuser', onclick:(e)=>{e.stopPropagation(); ackAlert(id);} }),
+      el('button',{className:'btn warn',    textContent:'En cours', onclick:(e)=>{e.stopPropagation(); setAlertStatus(id,'EN_COURS');} }),
+      el('button',{className:'btn',         textContent:'Terminer', onclick:(e)=>{e.stopPropagation(); setAlertStatus(id,'TERMINEE');} })
+    ])
+  ].filter(Boolean));
+
+  header.addEventListener('click',()=>{ details.style.display = details.style.display==='none' ? 'block' : 'none'; });
+
+  box.append(header, el('div',{className:'divider'}), details);
+  return box;
+}
 
   function listenAlertsFor(team){
     onValue(ref(db,'alerts'),(snap)=>{
@@ -423,39 +449,64 @@
   /* ========= ADRESSE – AUTOCOMPLETE (centré Cher) ========= */
   const addrInput = document.getElementById('m-addr');
   const addrList  = document.getElementById('addr-list');
-  let acTimer=null;
+  let acTimer = null;
 
   function inCher(p){
-    const county=(p.county||'').toLowerCase();
-    const state=(p.state||'').toLowerCase();
-    const pc=(p.postcode||'');
-    return county.includes('cher') || pc.startsWith('18') || (p.city||'').toLowerCase().includes('bourges') || state.includes('centre-val');
+    const county = (p.county||'').toLowerCase();
+    const state  = (p.state||'').toLowerCase();
+    const pc     = (p.postcode||'');
+    return county.includes('cher') || pc.startsWith('18') ||
+           (p.city||'').toLowerCase().includes('bourges') ||
+           state.includes('centre-val');
   }
 
   addrInput?.addEventListener('input', ()=>{
-    const q=addrInput.value.trim();
+    const q = addrInput.value.trim();
     clearTimeout(acTimer);
-    if(q.length<3){ addrList.style.display='none'; addrList.innerHTML=''; return; }
-    acTimer=setTimeout(async()=>{
-      try{
-        const url=`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lang=fr&limit=20&lat=47.0833&lon=2.4`;
-        const res=await fetch(url); const data=await res.json();
-        addrList.innerHTML='';
-        let feats=(data.features||[]).filter(f=> inCher(f.properties||{}));
-        if(feats.length===0) feats=(data.features||[]).slice(0,5); // secours si hors Cher
+    if(q.length < 3){
+      addrList.style.display = 'none';
+      addrList.innerHTML = '';
+      return;
+    }
+    acTimer = setTimeout(async ()=>{
+      try {
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lang=fr&limit=20&lat=47.0833&lon=2.4`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        addrList.innerHTML = '';
+
+        let feats = (data.features || []).filter(f => inCher((f.properties)||{}));
+        if (feats.length === 0) feats = (data.features || []).slice(0, 5);
+
         feats.forEach(f=>{
-          const p=f.properties||{};
-          const line=[p.name,p.housenumber,p.street,p.city,p.postcode,p.country].filter(Boolean).join(', ');
+          const p = f.properties || {};
+          const line = [p.name, p.housenumber, p.street, p.city, p.postcode, p.country].filter(Boolean).join(', ');
           if(!line) return;
-          const item=el('div',{className:'ac-item',textContent:line});
-          item.addEventListener('click',()=>{ addrInput.value=line; addrList.style.display='none'; addrList.innerHTML=''; });
+          const item = document.createElement('div');
+          item.className = 'ac-item';
+          item.textContent = line;
+          item.addEventListener('click', ()=>{
+            addrInput.value = line;
+            addrList.style.display = 'none';
+            addrList.innerHTML = '';
+          });
           addrList.append(item);
         });
-        addrList.style.display = addrList.children.length?'block':'none';
-      }catch(e){ console.warn('Autocomplete failed',e); addrList.style.display='none'; }
-    },300);
+
+        addrList.style.display = addrList.children.length ? 'block' : 'none';
+      } catch (e) {
+        console.warn('Autocomplete failed', e);
+        addrList.style.display = 'none';
+      }
+    }, 300);
   });
-  document.addEventListener('click',(e)=>{ if(!addrList.contains(e.target) && e.target!==addrInput){ addrList.style.display='none'; } });
+
+  document.addEventListener('click', (e)=>{
+    if(!addrList.contains(e.target) && e.target !== addrInput){
+      addrList.style.display = 'none';
+    }
+  });
 
   /* ========= URL PARAMS → rôle direct ========= */
   const role = new URLSearchParams(location.search).get('role');
