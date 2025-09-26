@@ -48,6 +48,30 @@
     .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
     .twocol{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     @media (max-width:900px){.grid{grid-template-columns:1fr}}
+
+    /* Statuts visibles */
+    /* Statuts super lisibles */
+.status{
+  padding:6px 10px;border-radius:999px;font-size:13px;font-weight:600;letter-spacing:.2px;
+  border:1px solid #334155;display:inline-flex;gap:8px;align-items:center
+}
+.status .dot{width:10px;height:10px;border-radius:999px;background:#64748b;display:inline-block}
+.status.NEW{background:#07242a;border-color:#0e7490;color:#a5f3fc}
+.status.ACK{background:#07261e;border-color:#047857;color:#bbf7d0}
+.status.RUN{background:#2b1c0e;border-color:#b45309;color:#ffedd5}
+.status.DONE{background:#0f2412;border-color:#166534;color:#bbf7d0}
+.status.MISSION{background:#10172a;border-color:#334155;color:#e5e7eb}
+.status.MISSION.RUN .dot{background:#f59e0b}
+.status.MISSION.DONE .dot{background:#22c55e}
+
+/* Carte statuts rapides collante en haut */
+.stickyTop{position:sticky;top:8px;z-index:5}
+
+    /* Autocomplete adresse */
+    .ac-wrap{position:relative}
+    .ac-list{position:absolute;inset:auto 0 0 0; transform:translateY(102%); background:#0e1627;border:1px solid #2b3a57; border-radius:12px; padding:6px; display:none; z-index:50; max-height:220px; overflow:auto}
+    .ac-item{padding:8px;border-radius:8px;cursor:pointer}
+    .ac-item:hover{background:#14213d}
   </style>
 </head>
 <body>
@@ -99,9 +123,10 @@
               </div>
             </div>
             <div class="twocol" style="margin-top:10px">
-              <div>
+              <div class="ac-wrap">
                 <label>Adresse</label>
-                <input id="m-addr" placeholder="Adresse/lieu" />
+                <input id="m-addr" placeholder="Adresse/lieu" autocomplete="off" />
+                <div id="addr-list" class="ac-list"></div>
               </div>
               <div>
                 <label>Équipe assignée</label>
@@ -140,6 +165,20 @@
     <section id="tab-team" class="tabpane" hidden>
       <div class="grid">
         <div class="card">
+<div class="card stickyTop">
+  <h3>Statut rapide (équipe)</h3>
+  <div class="content">
+    <div class="row">
+      <button class="btn success" data-quick-status="EN_ROUTE">En route</button>
+      <button class="btn warn" data-quick-status="SUR_PLACE">Sur place</button>
+      <button class="btn" data-quick-status="TRANSPORT">Transport</button>
+      <button class="btn" data-quick-status="DISPONIBLE">Disponible</button>
+    </div>
+    <p class="hint" style="margin-top:8px">Met à jour le <b>statut d’équipe</b> sur la dernière alerte active.</p>
+  </div>
+</div>
+
+<div class="card">
           <h3>Alertes reçues (<span id="teamNameLabel">SMUR 1</span>)</h3>
           <div class="content">
             <div id="alerts" class="list"></div>
@@ -148,7 +187,7 @@
         </div>
 
         <div class="card">
-          <h3>Statut rapide</h3>
+          <h3>Statut rapide (équipe)</h3>
           <div class="content">
             <div class="row">
               <button class="btn success" data-quick-status="EN_ROUTE">En route</button>
@@ -156,7 +195,7 @@
               <button class="btn" data-quick-status="TRANSPORT">Transport</button>
               <button class="btn" data-quick-status="DISPONIBLE">Disponible</button>
             </div>
-            <p class="hint" style="margin-top:8px">Le statut rapide s'applique à la dernière mission active de votre équipe.</p>
+            <p class="hint" style="margin-top:8px">Le statut rapide met à jour le <b>statut d'équipe</b> de la dernière alerte active. Le statut global (NOUVELLE/ACCUSEE/EN_COURS/TERMINEE) reste inchangé.</p>
           </div>
         </div>
       </div>
@@ -168,28 +207,11 @@
         <h3>Déploiement 100% gratuit</h3>
         <div class="content">
           <ol>
-            <li>Crée un projet Firebase (plan Spark gratuit) → active <b>Authentication</b> (anonyme) et <b>Realtime Database</b> en mode sécurisé (règles ci-dessous).</li>
+            <li>Crée un projet Firebase (plan Spark gratuit) → active <b>Authentication</b> (anonyme) et <b>Realtime Database</b>.</li>
             <li>Dans ⚙️ Paramètres → Configuration du SDK Web, copie ta configuration dans la section <span class="mono">FIREBASE_CONFIG</span> ci-dessous.</li>
             <li>Publie ce fichier sur GitHub (branche <span class="mono">main</span>) et active GitHub Pages (root).</li>
             <li>Ouvre l'URL GitHub Pages sur tes 5 PC/smartphones : la synchro est instantanée.</li>
           </ol>
-          <div class="divider"></div>
-          <p><b>Règles Realtime Database conseillées (minimum fonctionnel)</b></p>
-          <pre class="mono" style="white-space:pre-wrap;background:#0e1627;padding:10px;border-radius:10px;border:1px solid #2b3a57">{
-  "rules": {
-    ".read": true,
-    ".write": true,
-    "missions": {
-      ".indexOn": ["team","status","createdAt"]
-    },
-    "alerts": {
-      ".indexOn": ["team","createdAt","status"]
-    }
-  }
-}
-</pre>
-<p class="hint">Si l'écriture échoue, passe temporairement ".write": true (comme ci-dessus) pour tester. Ensuite, on pourra sécuriser.</p>
-          <p class="hint">Ces règles ouvertes sont idéales pour un test en interne. Pour plus de sécurité, restreins par IP ou ajoute un <i>secret PIN</i> de régulation (cf. constante <span class="mono">REG_PIN</span> ci-dessous) et des règles basées sur le champ <span class="mono">role</span> si tu souhaites.</p>
         </div>
       </div>
     </section>
@@ -197,9 +219,9 @@
     <p class="footer">© 2025 – Mini app pédagogique. Aucune donnée de santé. Adapté au SAMU / CRRA pour tests internes.</p>
   </div>
 
-  <!-- ===================== FIREBASE + APP ===================== -->
-  <script type="module">
-  // ======= CONFIG À RENSEIGNER =======
+ <!-- ===================== FIREBASE + APP ===================== -->
+<script type="module">
+  /* ========= CONFIG ========= */
   const FIREBASE_CONFIG = {
     apiKey: "AIzaSyAi0YZBqDaVngJRILRDwF9FXNdrUkw8UBs",
     authDomain: "samu-alerte.firebaseapp.com",
@@ -210,174 +232,115 @@
     appId: "1:636814603515:web:340fab037735debed32c5e",
     measurementId: "G-9LC4YGNJR0"
   };
-  // PIN optionnel. Mets "" pour désactiver durant les tests
-  const REG_PIN = "";
-
-  // Équipes disponibles
+  const REG_PIN = ""; // vide = pas de PIN pendant les tests
   const TEAMS = ["SMUR 1","SMUR 2","SMUR Secondaire","Ambulance 1","Ambulance 2"];
 
-  // ======= IMPORTS FIREBASE (v10) =======
+  /* ========= IMPORTS ========= */
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import {
-    getDatabase, ref, push, set, onValue, query, orderByChild, update
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  import { getDatabase, ref, push, set, onValue, query, orderByChild, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
   import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-  // ======= HELPERS UI =======
-  const $ = (sel)=>document.querySelector(sel);
-  const el = (tag, props={}, children=[])=>{
-    const e=document.createElement(tag);
-    Object.assign(e,props);
-    children.forEach(c=>{ if(c) e.append(c); });
-    return e;
-  };
-  const fmtTime = (ts)=> (new Date(ts||Date.now())).toLocaleString();
-  const prioTag = (p)=> p==="1"?"red":(p==="2"?"orange":"green");
-
-  // ======= INIT APP =======
+  /* ========= INIT ========= */
   const app = initializeApp(FIREBASE_CONFIG);
   const db  = getDatabase(app);
   const auth= getAuth(app);
+  await signInAnonymously(auth);
 
-  if(!FIREBASE_CONFIG.databaseURL){
-    alert("⚠️ databaseURL manquant dans FIREBASE_CONFIG.");
-  }
+  /* ========= HELPERS ========= */
+  const $  = (s)=>document.querySelector(s);
+  const el = (t, props={}, kids=[])=>{ const e=document.createElement(t); Object.assign(e,props); kids.forEach(k=>k&&e.append(k)); return e; };
+  const fmtTime = (ts)=> new Date(ts||Date.now()).toLocaleString();
+  const prioTag = (p)=> p==="1"?"red":(p==="2"?"orange":"green");
 
-  try{
-    await signInAnonymously(auth);
-    console.log("Auth anonyme OK");
-  }catch(e){
-    console.error(e);
-    alert("⚠️ Échec auth anonyme: " + (e?.message||e));
-  }
-
-  // ======= TABS =======
+  /* ========= TABS / ROLE ========= */
   document.querySelectorAll('.tab').forEach(b=>{
     b.addEventListener('click',()=>{
       document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
       b.classList.add('active');
       document.querySelectorAll('.tabpane').forEach(p=>p.hidden=true);
       $('#tab-'+b.dataset.tab).hidden=false;
-      if(b.dataset.tab==='team') $('#roleSelect').value='team';
-      if(b.dataset.tab==='reg')  $('#roleSelect').value='reg';
+      $('#roleSelect').value = b.dataset.tab;
     });
   });
-  $('#roleSelect').addEventListener('change', e=>{
-    const v=e.target.value;
-    document.querySelector(`[data-tab="${v}"]`).click();
+  $('#roleSelect').addEventListener('change',e=>{
+    const v=e.target.value; document.querySelector(`[data-tab="${v}"]`).click();
   });
 
-  // ======= TEAM SELECT =======
+  /* ========= TEAM SELECT ========= */
   const teamSelect = $('#teamSelect');
   const teamNameLabel = $('#teamNameLabel');
   TEAMS.forEach(t=>{
-    if (![...teamSelect.options].some(o=>o.value===t)){
-      teamSelect.append(el('option',{value:t, textContent:t}));
-    }
+    if(![...teamSelect.options].some(o=>o.value===t)) teamSelect.append(el('option',{value:t,textContent:t}));
   });
   teamSelect.addEventListener('change',()=> teamNameLabel.textContent = teamSelect.value);
   teamNameLabel.textContent = teamSelect.value;
 
-  // ======= REG – FORM =======
+  /* ========= REG – FORM ========= */
   const mTitle=$('#m-title'), mPrio=$('#m-prio'), mAddr=$('#m-addr'), mTeam=$('#m-team'), mNotes=$('#m-notes');
   const btnDraft=$('#btn-draft'), btnAlert=$('#btn-alert');
 
   const readMissionForm = ()=>({
     title: mTitle.value.trim(),
-    prio:  mPrio.value,
-    addr:  mAddr.value.trim(),
-    team:  mTeam.value,
+    prio: mPrio.value,
+    addr: mAddr.value.trim(),
+    team: mTeam.value,
     notes: mNotes.value.trim(),
-    status:"BROUILLON",
+    status: "BROUILLON",
     createdAt: Date.now(),
     updatedAt: Date.now()
   });
-
-  function clearForm(){ mTitle.value=''; mAddr.value=''; mNotes.value=''; mPrio.value='3'; }
+  const clearForm = ()=>{ mTitle.value=''; mAddr.value=''; mNotes.value=''; mPrio.value='3'; };
 
   btnDraft.addEventListener('click', async()=>{
     const data = readMissionForm();
     if(!data.title){ alert('Intitulé requis'); return; }
-    try{
-      const r = push(ref(db,'missions'));
-      await set(r, data);
-      alert('Brouillon enregistré');
-      clearForm();
-    }catch(e){
-      console.error(e);
-      alert('❌ Échec enregistrement: '+(e?.message||e));
-    }
+    const r = push(ref(db,'missions')); await set(r,data);
+    alert('Brouillon enregistré'); clearForm();
   });
 
   btnAlert.addEventListener('click', async()=>{
     const data = readMissionForm();
     if(!data.title){ alert('Intitulé requis'); return; }
-
-    // PIN optionnel
-    if (REG_PIN) {
-      const pin = prompt('PIN régulation ?');
-      if (pin !== REG_PIN) { alert('PIN incorrect'); return; }
-    }
-
-    try{
-      // 1) Créer mission
-      data.status = 'ENVOYEE';
-      const missionRef = push(ref(db,'missions'));
-      await set(missionRef, data);
-
-      // 2) Créer alerte
-      const alertRef = push(ref(db,'alerts'));
-      await set(alertRef, {
-        missionId: missionRef.key,
-        team: data.team,
-        title: data.title,
-        addr: data.addr,
-        prio: data.prio,
-        notes: data.notes,
-        status: 'NOUVELLE',
-        createdAt: Date.now(),
-        ackAt: null,
-        lastStatusAt: Date.now(),
-        teamStatus: null
-      });
-
-      alert('🚨 Alerte envoyée à '+data.team);
-      clearForm();
-    }catch(e){
-      console.error(e);
-      alert('❌ Échec envoi alerte: '+(e?.message||e));
-    }
+    if(REG_PIN){ const pin=prompt('PIN régulation ?'); if(pin!==REG_PIN){ alert('PIN incorrect'); return; } }
+    // 1) Mission
+    data.status='ENVOYEE';
+    const missionRef = push(ref(db,'missions')); await set(missionRef,data);
+    // 2) Alerte liée
+    const alertRef = push(ref(db,'alerts'));
+    await set(alertRef,{
+      missionId: missionRef.key, team:data.team, title:data.title, addr:data.addr, prio:data.prio, notes:data.notes,
+      status:'NOUVELLE', createdAt:Date.now(), ackAt:null, lastStatusAt:Date.now(), teamStatus:null
+    });
+    alert('🚨 Alerte envoyée à '+data.team); clearForm();
   });
 
-  // ======= REG – LIST MISSIONS =======
-  const missionsEl = $('#missions');
-  const missionsEmpty = $('#missions-empty');
+  /* ========= REG – LIST ========= */
+  const missionsEl=$('#missions'), missionsEmpty=$('#missions-empty');
 
-  async function setStatus(id, status){
+  async function setStatus(id,status){
+    if(status==='DISPONIBLE'){ await set(ref(db,'missions/'+id), null); return; } // suppression auto
     await update(ref(db,'missions/'+id), { status, updatedAt: Date.now() });
   }
-  async function delMission(id){
-    if(confirm('Supprimer cette mission ?')){
-      await set(ref(db,'missions/'+id), null);
-    }
-  }
+  async function delMission(id){ if(confirm('Supprimer cette mission ?')) await set(ref(db,'missions/'+id), null); }
 
-  function renderMission(id, m){
-    const box = el('div',{className:'item'});
-    const header = el('div',{className:'top'},[
+  function renderMission(id,m){
+    const pill = el('span',{className:'status MISSION '+(m.status==='EN_COURS'?'RUN':(m.status==='TERMINE'?'DONE':''))},[
+      el('span',{className:'dot'}), document.createTextNode((m.status||'—').replace('_',' '))
+    ]);
+    const box=el('div',{className:'item'});
+    const header=el('div',{className:'top'},[
       el('div',{},[
-        el('strong',{textContent:m.title+" "}),
-        el('span',{className:'pill '+prioTag(m.prio),textContent:'P'+m.prio}),
-        el('span',{className:'muted',style:'margin-left:8px',textContent:m.team+' · '+fmtTime(m.createdAt)})
+        el('strong',{textContent:m.title+' '}), el('span',{className:'pill '+prioTag(m.prio),textContent:'P'+m.prio}),
+        pill, el('span',{className:'muted',style:'margin-left:8px',textContent:m.team+' · '+fmtTime(m.createdAt)})
       ]),
       el('div',{className:'right'},[
-        el('button',{className:'btn',      textContent:'Disponible', onclick:()=> setStatus(id,'DISPONIBLE')}),
-        el('button',{className:'btn warn', textContent:'En cours',   onclick:()=> setStatus(id,'EN_COURS')}),
-        el('button',{className:'btn success', textContent:'Terminé', onclick:()=> setStatus(id,'TERMINE')}),
-        el('button',{className:'btn danger',  textContent:'Supprimer', onclick:()=> delMission(id)})
+        el('button',{className:'btn',textContent:'Disponible',onclick:()=>setStatus(id,'DISPONIBLE')}),
+        el('button',{className:'btn warn',textContent:'En cours',onclick:()=>setStatus(id,'EN_COURS')}),
+        el('button',{className:'btn success',textContent:'Terminé',onclick:()=>setStatus(id,'TERMINE')}),
+        el('button',{className:'btn danger',textContent:'Supprimer',onclick:()=>delMission(id)})
       ])
     ]);
-    const body = el('div',{},[
+    const body=el('div',{},[
       el('div',{className:'muted',textContent:m.addr||'— adresse —'}),
       el('div',{className:'muted',style:'margin-top:6px',textContent:m.notes||'—'})
     ]);
@@ -385,95 +348,117 @@
     return box;
   }
 
-  onValue(query(ref(db,'missions'), orderByChild('createdAt')), (snap)=>{
-    missionsEl.innerHTML='';
-    const list=[];
-    snap.forEach(c=> list.push({id:c.key, ...c.val()}));
-    list.sort((a,b)=> b.createdAt-a.createdAt);
-    list.forEach(m=> missionsEl.append(renderMission(m.id, m)));
-    missionsEmpty.style.display = list.length? 'none':'block';
+  onValue(query(ref(db,'missions'), orderByChild('createdAt')),(snap)=>{
+    missionsEl.innerHTML=''; const list=[];
+    snap.forEach(c=> list.push({id:c.key,...c.val()}));
+    list.sort((a,b)=>b.createdAt-a.createdAt);
+    list.forEach(m=> missionsEl.append(renderMission(m.id,m)));
+    missionsEmpty.style.display = list.length?'none':'block';
   });
 
-  // ======= TEAM – ALERTS =======
-  const alertsEl = $('#alerts');
-  const alertsEmpty = $('#alerts-empty');
+  /* ========= TEAM – ALERTS ========= */
+  const alertsEl=$('#alerts'), alertsEmpty=$('#alerts-empty');
 
-  function renderAlert(id, a){
-    const box = el('div',{className:'item'});
+  async function ackAlert(id){ await update(ref(db,'alerts/'+id), { status:'ACCUSEE', ackAt:Date.now(), lastStatusAt:Date.now() }); }
+  async function setAlertStatus(id,status){
+    await update(ref(db,'alerts/'+id), { status, lastStatusAt:Date.now() });
+    // Si alerte terminée → supprimer la mission liée
+    if(status==='TERMINEE'){
+      const s = await new Promise(res=> onValue(ref(db,'alerts/'+id),res,{onlyOnce:true}));
+      const a = s.val(); if(a?.missionId){ await set(ref(db,'missions/'+a.missionId), null); }
+    }
+  }
 
-    const leftBits = [
-      el('strong',{textContent:a.title+" "}),
-      el('span',{className:'pill '+prioTag(a.prio),textContent:'P'+a.prio}),
-      a.teamStatus ? el('span',{className:'pill', style:'margin-left:6px', textContent:'Équipe: '+a.teamStatus.replace('_',' ')}) : null,
-      el('span',{className:'muted',style:'margin-left:8px',textContent:fmtTime(a.createdAt)})
-    ].filter(Boolean);
-
-    const header = el('div',{className:'top'},[
-      el('div',{}, leftBits),
+  function renderAlert(id,a){
+    let cls='NEW'; if(a.status==='ACCUSEE')cls='ACK'; else if(a.status==='EN_COURS')cls='RUN'; else if(a.status==='TERMINEE')cls='DONE';
+    const aStatus = el('span',{className:'status '+cls},[ el('span',{className:'dot'}), document.createTextNode(a.status.replace('_',' ')) ]);
+    const box=el('div',{className:'item'});
+    const header=el('div',{className:'top'},[
+      el('div',{},[
+        el('strong',{textContent:a.title+' '}), el('span',{className:'pill '+prioTag(a.prio),textContent:'P'+a.prio}),
+        aStatus, a.teamStatus? el('span',{className:'pill',style:'margin-left:6px',textContent:'Équipe: '+a.teamStatus.replace('_',' ')}):null,
+        el('span',{className:'muted',style:'margin-left:8px',textContent:fmtTime(a.createdAt)})
+      ].filter(Boolean)),
       el('div',{className:'right'},[
-        el('button',{className:'btn success', textContent:'Accuser', onclick:()=> ackAlert(id)}),
-        el('button',{className:'btn warn',    textContent:'En cours', onclick:()=> setAlertStatus(id,'EN_COURS')}),
-        el('button',{className:'btn',         textContent:'Terminer', onclick:()=> setAlertStatus(id,'TERMINEE')})
+        el('button',{className:'btn success',textContent:'Accuser',onclick:()=>ackAlert(id)}),
+        el('button',{className:'btn warn',textContent:'En cours',onclick:()=>setAlertStatus(id,'EN_COURS')}),
+        el('button',{className:'btn',textContent:'Terminer',onclick:()=>setAlertStatus(id,'TERMINEE')})
       ])
     ]);
-
-    const body = el('div',{},[
+    const body=el('div',{},[
       el('div',{className:'muted',textContent:a.addr||'— adresse —'}),
       el('div',{className:'muted',style:'margin-top:6px',textContent:a.notes||'—'}),
       el('div',{className:'muted',style:'margin-top:6px',textContent:'Équipe : '+a.team}),
       a.ackAt? el('div',{className:'muted',style:'margin-top:6px',textContent:'Accusé à '+fmtTime(a.ackAt)}):null
     ].filter(Boolean));
-
     box.append(header, el('div',{className:'divider'}), body);
     return box;
   }
 
-  async function ackAlert(id){
-    await update(ref(db,'alerts/'+id), { status:'ACCUSEE', ackAt: Date.now(), lastStatusAt: Date.now() });
-  }
-  async function setAlertStatus(id, status){
-    await update(ref(db,'alerts/'+id), { status, lastStatusAt: Date.now() });
-  }
-
   function listenAlertsFor(team){
-    onValue(ref(db,'alerts'), (snap)=>{
-      alertsEl.innerHTML='';
-      const list=[];
-      snap.forEach(c=>{ const v=c.val(); if(v.team===team) list.push({id:c.key, ...v}); });
-      list.sort((a,b)=> b.createdAt-a.createdAt);
-      list.forEach(a=> alertsEl.append(renderAlert(a.id,a)));
-      alertsEmpty.style.display = list.length? 'none':'block';
+    onValue(ref(db,'alerts'),(snap)=>{
+      alertsEl.innerHTML=''; const arr=[];
+      snap.forEach(c=>{ const v=c.val(); if(v.team===team) arr.push({id:c.key,...v}); });
+      arr.sort((a,b)=>b.createdAt-a.createdAt);
+      arr.forEach(a=> alertsEl.append(renderAlert(a.id,a)));
+      alertsEmpty.style.display = arr.length?'none':'block';
     });
   }
   listenAlertsFor(teamSelect.value);
   teamSelect.addEventListener('change',()=> listenAlertsFor(teamSelect.value));
 
-  // ======= TEAM – QUICK STATUS =======
+  /* ========= TEAM – QUICK STATUS (EN HAUT) ========= */
   document.querySelectorAll('[data-quick-status]').forEach(btn=>{
     btn.addEventListener('click', async()=>{
       const team = teamSelect.value;
-      const teamStatus = btn.dataset.quickStatus; // EN_ROUTE / SUR_PLACE / TRANSPORT / DISPONIBLE
-
-      // Dernière alerte non terminée pour cette équipe
-      const snap = await new Promise(res=> onValue(ref(db,'alerts'), res, { onlyOnce:true }));
-      const arr=[];
-      snap.forEach(c=>{ const v=c.val(); if(v.team===team && v.status!=="TERMINEE") arr.push({id:c.key, ...v}); });
-      arr.sort((a,b)=> b.createdAt-a.createdAt);
+      const teamStatus = btn.dataset.quickStatus;
+      const snap = await new Promise(res=> onValue(ref(db,'alerts'),res,{onlyOnce:true}));
+      const arr=[]; snap.forEach(c=>{ const v=c.val(); if(v.team===team && v.status!=='TERMINEE') arr.push({id:c.key,...v}); });
+      arr.sort((a,b)=>b.createdAt-a.createdAt);
       if(!arr.length){ alert('Aucune alerte active pour '+team); return; }
-
-      try{
-        await update(ref(db,'alerts/'+arr[0].id), { teamStatus, lastStatusAt: Date.now() });
-        alert('Statut équipe mis à jour: '+teamStatus.replace('_',' '));
-      }catch(e){
-        console.error(e);
-        alert('❌ Échec mise à jour: '+(e?.message||e));
-      }
+      await update(ref(db,'alerts/'+arr[0].id), { teamStatus, lastStatusAt:Date.now() });
     });
   });
 
-  // ======= URL PARAMS → rôle direct =======
-  const urlParams = new URLSearchParams(location.search);
-  const role = urlParams.get('role');
+  /* ========= ADRESSE – AUTOCOMPLETE (centré Cher) ========= */
+  const addrInput = document.getElementById('m-addr');
+  const addrList  = document.getElementById('addr-list');
+  let acTimer=null;
+
+  function inCher(p){
+    const county=(p.county||'').toLowerCase();
+    const state=(p.state||'').toLowerCase();
+    const pc=(p.postcode||'');
+    return county.includes('cher') || pc.startsWith('18') || (p.city||'').toLowerCase().includes('bourges') || state.includes('centre-val');
+  }
+
+  addrInput?.addEventListener('input', ()=>{
+    const q=addrInput.value.trim();
+    clearTimeout(acTimer);
+    if(q.length<3){ addrList.style.display='none'; addrList.innerHTML=''; return; }
+    acTimer=setTimeout(async()=>{
+      try{
+        const url=`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lang=fr&limit=20&lat=47.0833&lon=2.4`;
+        const res=await fetch(url); const data=await res.json();
+        addrList.innerHTML='';
+        let feats=(data.features||[]).filter(f=> inCher(f.properties||{}));
+        if(feats.length===0) feats=(data.features||[]).slice(0,5); // secours si hors Cher
+        feats.forEach(f=>{
+          const p=f.properties||{};
+          const line=[p.name,p.housenumber,p.street,p.city,p.postcode,p.country].filter(Boolean).join(', ');
+          if(!line) return;
+          const item=el('div',{className:'ac-item',textContent:line});
+          item.addEventListener('click',()=>{ addrInput.value=line; addrList.style.display='none'; addrList.innerHTML=''; });
+          addrList.append(item);
+        });
+        addrList.style.display = addrList.children.length?'block':'none';
+      }catch(e){ console.warn('Autocomplete failed',e); addrList.style.display='none'; }
+    },300);
+  });
+  document.addEventListener('click',(e)=>{ if(!addrList.contains(e.target) && e.target!==addrInput){ addrList.style.display='none'; } });
+
+  /* ========= URL PARAMS → rôle direct ========= */
+  const role = new URLSearchParams(location.search).get('role');
   if(role==='team'){ document.querySelector('[data-tab="team"]').click(); }
 </script>
 </body>
