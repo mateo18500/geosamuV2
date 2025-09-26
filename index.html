@@ -188,6 +188,7 @@
   }
 }
 </pre>
+<p class="hint">Si l'écriture échoue, passe temporairement ".write": true (comme ci-dessus) pour tester. Ensuite, on pourra sécuriser.</p>
           <p class="hint">Ces règles ouvertes sont idéales pour un test en interne. Pour plus de sécurité, restreins par IP ou ajoute un <i>secret PIN</i> de régulation (cf. constante <span class="mono">REG_PIN</span> ci-dessous) et des règles basées sur le champ <span class="mono">role</span> si tu souhaites.</p>
         </div>
       </div>
@@ -198,102 +199,133 @@
 
   <!-- ===================== FIREBASE + APP ===================== -->
   <script type="module">
-    // ======= CONFIGURATION À REMPLIR =======
-    const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyAi0YZBqDaVngJRILRDwF9FXNdrUkw8UBs",
-  authDomain: "samu-alerte.firebaseapp.com",
-  databaseURL: "https://samu-alerte-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "samu-alerte",
-  storageBucket: "samu-alerte.appspot.com",
-  messagingSenderId: "636814603515",
-  appId: "1:636814603515:web:340fab037735debed32c5e",
-  measurementId: "G-9LC4YGNJR0"
+  // ======= CONFIG À RENSEIGNER =======
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAi0YZBqDaVngJRILRDwF9FXNdrUkw8UBs",
+    authDomain: "samu-alerte.firebaseapp.com",
+    databaseURL: "https://samu-alerte-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "samu-alerte",
+    storageBucket: "samu-alerte.appspot.com",
+    messagingSenderId: "636814603515",
+    appId: "1:636814603515:web:340fab037735debed32c5e",
+    measurementId: "G-9LC4YGNJR0"
+  };
+  // PIN optionnel. Mets "" pour désactiver durant les tests
+  const REG_PIN = "";
 
-};
-    // (Optionnel) PIN de régulation à demander pour l'envoi d'une alerte
-    const REG_PIN = "0000"; // mets un code simple à partager uniquement aux régulateurs
+  // Équipes disponibles
+  const TEAMS = ["SMUR 1","SMUR 2","SMUR Secondaire","Ambulance 1","Ambulance 2"];
 
-    // Équipes disponibles (tu peux modifier la liste)
-    const TEAMS = ["SMUR 1","SMUR 2","SMUR Secondaire","Ambulance 1","Ambulance 2"];
+  // ======= IMPORTS FIREBASE (v10) =======
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getDatabase, ref, push, set, onValue, query, orderByChild, update
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    // ======= IMPORT SDK FIREBASE (v9 modules) =======
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, push, set, onValue, query, orderByChild, equalTo, update, serverTimestamp, limitToLast } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  // ======= HELPERS UI =======
+  const $ = (sel)=>document.querySelector(sel);
+  const el = (tag, props={}, children=[])=>{
+    const e=document.createElement(tag);
+    Object.assign(e,props);
+    children.forEach(c=>{ if(c) e.append(c); });
+    return e;
+  };
+  const fmtTime = (ts)=> (new Date(ts||Date.now())).toLocaleString();
+  const prioTag = (p)=> p==="1"?"red":(p==="2"?"orange":"green");
 
-    // ======= INIT =======
-    const app = initializeApp(FIREBASE_CONFIG);
-    const db = getDatabase(app);
-    const auth = getAuth(app);
-    await signInAnonymously(auth).catch(console.error);
+  // ======= INIT APP =======
+  const app = initializeApp(FIREBASE_CONFIG);
+  const db  = getDatabase(app);
+  const auth= getAuth(app);
 
-    // ======= UI HELPERS =======
-    const $ = (sel)=>document.querySelector(sel);
-    const el = (tag, props={}, children=[])=>{
-      const e=document.createElement(tag);Object.assign(e,props);children.forEach(c=>e.append(c));return e;
-    }
-    const fmtTime = (ts)=>{
-      const d = new Date(ts || Date.now());
-      return d.toLocaleString();
-    }
-    const prioTag = (p)=> p=="1"?"red":(p==="2"?"orange":"green");
+  if(!FIREBASE_CONFIG.databaseURL){
+    alert("⚠️ databaseURL manquant dans FIREBASE_CONFIG.");
+  }
 
-    // ======= TABS / ROLE =======
-    const tabBtns = document.querySelectorAll('.tab');
-    tabBtns.forEach(b=>b.addEventListener('click',()=>{
-      tabBtns.forEach(x=>x.classList.remove('active'));
+  try{
+    await signInAnonymously(auth);
+    console.log("Auth anonyme OK");
+  }catch(e){
+    console.error(e);
+    alert("⚠️ Échec auth anonyme: " + (e?.message||e));
+  }
+
+  // ======= TABS =======
+  document.querySelectorAll('.tab').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
       b.classList.add('active');
       document.querySelectorAll('.tabpane').forEach(p=>p.hidden=true);
       $('#tab-'+b.dataset.tab).hidden=false;
       if(b.dataset.tab==='team') $('#roleSelect').value='team';
-      if(b.dataset.tab==='reg') $('#roleSelect').value='reg';
-    }));
-    $('#roleSelect').addEventListener('change', e=>{
-      const v=e.target.value; document.querySelector(`[data-tab="${v}"]`).click();
+      if(b.dataset.tab==='reg')  $('#roleSelect').value='reg';
     });
+  });
+  $('#roleSelect').addEventListener('change', e=>{
+    const v=e.target.value;
+    document.querySelector(`[data-tab="${v}"]`).click();
+  });
 
-    // Keep team select in sync
-    const teamSelect = $('#teamSelect');
-    const teamNameLabel = $('#teamNameLabel');
-    TEAMS.forEach(t=>{ if(![...teamSelect.options].some(o=>o.value===t)){ teamSelect.append(el('option',{value:t, textContent:t})) } });
-    teamSelect.addEventListener('change',()=> teamNameLabel.textContent = teamSelect.value);
+  // ======= TEAM SELECT =======
+  const teamSelect = $('#teamSelect');
+  const teamNameLabel = $('#teamNameLabel');
+  TEAMS.forEach(t=>{
+    if (![...teamSelect.options].some(o=>o.value===t)){
+      teamSelect.append(el('option',{value:t, textContent:t}));
+    }
+  });
+  teamSelect.addEventListener('change',()=> teamNameLabel.textContent = teamSelect.value);
+  teamNameLabel.textContent = teamSelect.value;
 
-    // ======= REG – CREATE MISSION =======
-    const mTitle=$('#m-title'), mPrio=$('#m-prio'), mAddr=$('#m-addr'), mTeam=$('#m-team'), mNotes=$('#m-notes');
-    const btnDraft=$('#btn-draft'), btnAlert=$('#btn-alert');
+  // ======= REG – FORM =======
+  const mTitle=$('#m-title'), mPrio=$('#m-prio'), mAddr=$('#m-addr'), mTeam=$('#m-team'), mNotes=$('#m-notes');
+  const btnDraft=$('#btn-draft'), btnAlert=$('#btn-alert');
 
-    const readMissionForm = ()=>({
-      title: mTitle.value.trim(),
-      prio: mPrio.value,
-      addr: mAddr.value.trim(),
-      team: mTeam.value,
-      notes: mNotes.value.trim(),
-      status: "BROUILLON",
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    });
+  const readMissionForm = ()=>({
+    title: mTitle.value.trim(),
+    prio:  mPrio.value,
+    addr:  mAddr.value.trim(),
+    team:  mTeam.value,
+    notes: mNotes.value.trim(),
+    status:"BROUILLON",
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  });
 
-    btnDraft.addEventListener('click', async()=>{
-      const data = readMissionForm();
-      if(!data.title){alert('Intitulé requis'); return}
+  function clearForm(){ mTitle.value=''; mAddr.value=''; mNotes.value=''; mPrio.value='3'; }
+
+  btnDraft.addEventListener('click', async()=>{
+    const data = readMissionForm();
+    if(!data.title){ alert('Intitulé requis'); return; }
+    try{
       const r = push(ref(db,'missions'));
       await set(r, data);
       alert('Brouillon enregistré');
       clearForm();
-    });
+    }catch(e){
+      console.error(e);
+      alert('❌ Échec enregistrement: '+(e?.message||e));
+    }
+  });
 
-    btnAlert.addEventListener('click', async()=>{
-      const data = readMissionForm();
-      if(!data.title){alert('Intitulé requis'); return}
-      const pin = prompt('PIN régulation ? (ou laisse vide si non configuré)');
-      if(pin!==null && pin!==REG_PIN){ alert('PIN incorrect'); return }
+  btnAlert.addEventListener('click', async()=>{
+    const data = readMissionForm();
+    if(!data.title){ alert('Intitulé requis'); return; }
 
-      // 1) Crée la mission (statut = ENVOYEE)
+    // PIN optionnel
+    if (REG_PIN) {
+      const pin = prompt('PIN régulation ?');
+      if (pin !== REG_PIN) { alert('PIN incorrect'); return; }
+    }
+
+    try{
+      // 1) Créer mission
       data.status = 'ENVOYEE';
       const missionRef = push(ref(db,'missions'));
       await set(missionRef, data);
 
-      // 2) Pousse une alerte liée
+      // 2) Créer alerte
       const alertRef = push(ref(db,'alerts'));
       await set(alertRef, {
         missionId: missionRef.key,
@@ -302,132 +334,147 @@
         addr: data.addr,
         prio: data.prio,
         notes: data.notes,
-        status: 'NOUVELLE', // NOUVELLE → ACCUSEE → EN_COURS → TERMINEE (côté régulation)
+        status: 'NOUVELLE',
         createdAt: Date.now(),
         ackAt: null,
-        lastStatusAt: Date.now()
+        lastStatusAt: Date.now(),
+        teamStatus: null
       });
 
       alert('🚨 Alerte envoyée à '+data.team);
       clearForm();
+    }catch(e){
+      console.error(e);
+      alert('❌ Échec envoi alerte: '+(e?.message||e));
+    }
+  });
+
+  // ======= REG – LIST MISSIONS =======
+  const missionsEl = $('#missions');
+  const missionsEmpty = $('#missions-empty');
+
+  async function setStatus(id, status){
+    await update(ref(db,'missions/'+id), { status, updatedAt: Date.now() });
+  }
+  async function delMission(id){
+    if(confirm('Supprimer cette mission ?')){
+      await set(ref(db,'missions/'+id), null);
+    }
+  }
+
+  function renderMission(id, m){
+    const box = el('div',{className:'item'});
+    const header = el('div',{className:'top'},[
+      el('div',{},[
+        el('strong',{textContent:m.title+" "}),
+        el('span',{className:'pill '+prioTag(m.prio),textContent:'P'+m.prio}),
+        el('span',{className:'muted',style:'margin-left:8px',textContent:m.team+' · '+fmtTime(m.createdAt)})
+      ]),
+      el('div',{className:'right'},[
+        el('button',{className:'btn',      textContent:'Disponible', onclick:()=> setStatus(id,'DISPONIBLE')}),
+        el('button',{className:'btn warn', textContent:'En cours',   onclick:()=> setStatus(id,'EN_COURS')}),
+        el('button',{className:'btn success', textContent:'Terminé', onclick:()=> setStatus(id,'TERMINE')}),
+        el('button',{className:'btn danger',  textContent:'Supprimer', onclick:()=> delMission(id)})
+      ])
+    ]);
+    const body = el('div',{},[
+      el('div',{className:'muted',textContent:m.addr||'— adresse —'}),
+      el('div',{className:'muted',style:'margin-top:6px',textContent:m.notes||'—'})
+    ]);
+    box.append(header, el('div',{className:'divider'}), body);
+    return box;
+  }
+
+  onValue(query(ref(db,'missions'), orderByChild('createdAt')), (snap)=>{
+    missionsEl.innerHTML='';
+    const list=[];
+    snap.forEach(c=> list.push({id:c.key, ...c.val()}));
+    list.sort((a,b)=> b.createdAt-a.createdAt);
+    list.forEach(m=> missionsEl.append(renderMission(m.id, m)));
+    missionsEmpty.style.display = list.length? 'none':'block';
+  });
+
+  // ======= TEAM – ALERTS =======
+  const alertsEl = $('#alerts');
+  const alertsEmpty = $('#alerts-empty');
+
+  function renderAlert(id, a){
+    const box = el('div',{className:'item'});
+
+    const leftBits = [
+      el('strong',{textContent:a.title+" "}),
+      el('span',{className:'pill '+prioTag(a.prio),textContent:'P'+a.prio}),
+      a.teamStatus ? el('span',{className:'pill', style:'margin-left:6px', textContent:'Équipe: '+a.teamStatus.replace('_',' ')}) : null,
+      el('span',{className:'muted',style:'margin-left:8px',textContent:fmtTime(a.createdAt)})
+    ].filter(Boolean);
+
+    const header = el('div',{className:'top'},[
+      el('div',{}, leftBits),
+      el('div',{className:'right'},[
+        el('button',{className:'btn success', textContent:'Accuser', onclick:()=> ackAlert(id)}),
+        el('button',{className:'btn warn',    textContent:'En cours', onclick:()=> setAlertStatus(id,'EN_COURS')}),
+        el('button',{className:'btn',         textContent:'Terminer', onclick:()=> setAlertStatus(id,'TERMINEE')})
+      ])
+    ]);
+
+    const body = el('div',{},[
+      el('div',{className:'muted',textContent:a.addr||'— adresse —'}),
+      el('div',{className:'muted',style:'margin-top:6px',textContent:a.notes||'—'}),
+      el('div',{className:'muted',style:'margin-top:6px',textContent:'Équipe : '+a.team}),
+      a.ackAt? el('div',{className:'muted',style:'margin-top:6px',textContent:'Accusé à '+fmtTime(a.ackAt)}):null
+    ].filter(Boolean));
+
+    box.append(header, el('div',{className:'divider'}), body);
+    return box;
+  }
+
+  async function ackAlert(id){
+    await update(ref(db,'alerts/'+id), { status:'ACCUSEE', ackAt: Date.now(), lastStatusAt: Date.now() });
+  }
+  async function setAlertStatus(id, status){
+    await update(ref(db,'alerts/'+id), { status, lastStatusAt: Date.now() });
+  }
+
+  function listenAlertsFor(team){
+    onValue(ref(db,'alerts'), (snap)=>{
+      alertsEl.innerHTML='';
+      const list=[];
+      snap.forEach(c=>{ const v=c.val(); if(v.team===team) list.push({id:c.key, ...v}); });
+      list.sort((a,b)=> b.createdAt-a.createdAt);
+      list.forEach(a=> alertsEl.append(renderAlert(a.id,a)));
+      alertsEmpty.style.display = list.length? 'none':'block';
     });
+  }
+  listenAlertsFor(teamSelect.value);
+  teamSelect.addEventListener('change',()=> listenAlertsFor(teamSelect.value));
 
-    function clearForm(){ mTitle.value=''; mAddr.value=''; mNotes.value=''; mPrio.value='3'; }
+  // ======= TEAM – QUICK STATUS =======
+  document.querySelectorAll('[data-quick-status]').forEach(btn=>{
+    btn.addEventListener('click', async()=>{
+      const team = teamSelect.value;
+      const teamStatus = btn.dataset.quickStatus; // EN_ROUTE / SUR_PLACE / TRANSPORT / DISPONIBLE
 
-    // ======= REG – MISSIONS LISTEN =======
-    const missionsEl = $('#missions');
-    const missionsEmpty = $('#missions-empty');
+      // Dernière alerte non terminée pour cette équipe
+      const snap = await new Promise(res=> onValue(ref(db,'alerts'), res, { onlyOnce:true }));
+      const arr=[];
+      snap.forEach(c=>{ const v=c.val(); if(v.team===team && v.status!=="TERMINEE") arr.push({id:c.key, ...v}); });
+      arr.sort((a,b)=> b.createdAt-a.createdAt);
+      if(!arr.length){ alert('Aucune alerte active pour '+team); return; }
 
-    function renderMission(id, m){
-      const pillClass = m.prio==='1'?'pill red':(m.prio==='2'?'pill orange':'pill green');
-      const box = el('div',{className:'item'});
-      const header = el('div',{className:'top'},[
-        el('div',{},[
-          el('strong',{textContent:m.title+" "}),
-          el('span',{className:'pill '+prioTag(m.prio),textContent:'P'+m.prio}),
-          el('span',{className:'muted',style:'margin-left:8px',textContent:m.team+' · '+fmtTime(m.createdAt)})
-        ]),
-        el('div',{className:'right'},[
-          el('button',{className:'btn', textContent:'Disponible', onclick:()=> setStatus(id,'DISPONIBLE')}),
-          el('button',{className:'btn warn', textContent:'En cours', onclick:()=> setStatus(id,'EN_COURS')}),
-          el('button',{className:'btn success', textContent:'Terminé', onclick:()=> setStatus(id,'TERMINE')}),
-          el('button',{className:'btn danger', textContent:'Supprimer', onclick:()=> delMission(id)})
-        ])
-      ]);
-      const body = el('div',{},[
-        el('div',{className:'muted',textContent:m.addr||'— adresse —'}),
-        el('div',{className:'muted',style:'margin-top:6px',textContent:m.notes||'—'}),
-      ]);
-      box.append(header, el('div',{className:'divider'}), body);
-      return box;
-    }
-
-    async function setStatus(id, status){
-      await update(ref(db,'missions/'+id), { status, updatedAt: Date.now() });
-    }
-    async function delMission(id){
-      if(confirm('Supprimer cette mission ?')){
-        await set(ref(db,'missions/'+id), null);
+      try{
+        await update(ref(db,'alerts/'+arr[0].id), { teamStatus, lastStatusAt: Date.now() });
+        alert('Statut équipe mis à jour: '+teamStatus.replace('_',' '));
+      }catch(e){
+        console.error(e);
+        alert('❌ Échec mise à jour: '+(e?.message||e));
       }
-    }
-
-    onValue(query(ref(db,'missions'), orderByChild('createdAt')), (snap)=>{
-      missionsEl.innerHTML='';
-      const list = [];
-      snap.forEach(child=> list.push({id:child.key, ...child.val()}));
-      list.sort((a,b)=>b.createdAt-a.createdAt);
-      list.forEach(m=> missionsEl.append(renderMission(m.id,m)));
-      missionsEmpty.style.display = list.length? 'none':'block';
     });
+  });
 
-    // ======= TEAM – ALERTS LISTEN =======
-    const alertsEl = $('#alerts');
-    const alertsEmpty = $('#alerts-empty');
-
-    function renderAlert(id, a){
-      const box = el('div',{className:'item'});
-      const header = el('div',{className:'top'},[
-        el('div',{},[
-          el('strong',{textContent:a.title+" "}),
-          el('span',{className:'pill '+prioTag(a.prio),textContent:'P'+a.prio}),
-          el('span',{className:'muted',style:'margin-left:8px',textContent:fmtTime(a.createdAt)})
-        ]),
-        el('div',{className:'right'},[
-          el('button',{className:'btn success', textContent:'Accuser', onclick:()=> ackAlert(id)}),
-          el('button',{className:'btn warn', textContent:'En cours', onclick:()=> setAlertStatus(id,'EN_COURS')}),
-          el('button',{className:'btn', textContent:'Terminer', onclick:()=> setAlertStatus(id,'TERMINEE')})
-        ])
-      ]);
-      const body = el('div',{},[
-        el('div',{className:'muted',textContent:a.addr||'— adresse —'}),
-        el('div',{className:'muted',style:'margin-top:6px',textContent:a.notes||'—'}),
-        el('div',{className:'muted',style:'margin-top:6px',textContent:'Équipe : '+a.team}),
-        a.ackAt? el('div',{className:'muted',style:'margin-top:6px',textContent:'Accusé à '+fmtTime(a.ackAt)}):null
-      ].filter(Boolean));
-      box.append(header, el('div',{className:'divider'}), body);
-      return box;
-    }
-
-    async function ackAlert(id){
-      await update(ref(db,'alerts/'+id), { status:'ACCUSEE', ackAt: Date.now(), lastStatusAt: Date.now() });
-    }
-    async function setAlertStatus(id, status){
-      await update(ref(db,'alerts/'+id), { status, lastStatusAt: Date.now() });
-    }
-
-    function listenAlertsFor(team){
-      const q = query(ref(db,'alerts'));
-      onValue(q, (snap)=>{
-        alertsEl.innerHTML='';
-        const list=[]; snap.forEach(c=>{ const v=c.val(); if(v.team===team) list.push({id:c.key, ...v}); });
-        list.sort((a,b)=> b.createdAt-a.createdAt);
-        list.forEach(a=> alertsEl.append(renderAlert(a.id,a)));
-        alertsEmpty.style.display = list.length? 'none':'block';
-      });
-    }
-
-    listenAlertsFor(teamSelect.value);
-    teamSelect.addEventListener('change',()=> listenAlertsFor(teamSelect.value));
-
-    // ======= TEAM – QUICK STATUS =======
-    document.querySelectorAll('[data-quick-status]').forEach(btn=>{
-      btn.addEventListener('click', async()=>{
-        const status = btn.dataset.quickStatus;
-        // Cherche la dernière alerte pour cette équipe qui n'est pas TERMINEE
-        const team = teamSelect.value;
-        const snap = await new Promise(res=> onValue(query(ref(db,'alerts')), res, { onlyOnce:true }));
-        const arr=[]; snap.forEach(c=>{ const v=c.val(); if(v.team===team && v.status!=='TERMINEE') arr.push({id:c.key, ...v}); });
-        arr.sort((a,b)=> b.createdAt-a.createdAt);
-        if(!arr.length){ alert('Aucune mission active'); return }
-        await setAlertStatus(arr[0].id, status);
-      });
-    });
-
-    // ======= URL PARAMS → rôle direct =======
-    const urlParams = new URLSearchParams(location.search);
-    const role = urlParams.get('role');
-    if(role==='team'){ document.querySelector('[data-tab="team"]').click(); }
-
-  </script>
+  // ======= URL PARAMS → rôle direct =======
+  const urlParams = new URLSearchParams(location.search);
+  const role = urlParams.get('role');
+  if(role==='team'){ document.querySelector('[data-tab="team"]').click(); }
+</script>
 </body>
 </html>
