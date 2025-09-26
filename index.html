@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Alerte SAMU – Régulation & Équipes (gratuit)</title>
+  <meta name="description" content="Mini système d'alerte SAMU : création/suivi de missions côté régulation et réception d'alertes côté équipes. Hébergeable sur GitHub Pages. Synchro temps réel via Firebase gratuit (Spark)." />
+  <style>
+    :root{
+      --bg:#0b1220;--panel:#121b2e;--muted:#94a3b8;--text:#e5e7eb;--accent:#60a5fa;--accent-2:#34d399;--danger:#f87171;--warn:#fbbf24;--ok:#22c55e;
+    }
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+    .wrap{max-width:1100px;margin:auto;padding:16px}
+    header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .badge{font-size:12px;padding:4px 8px;border:1px solid #2b3a57;border-radius:999px;color:var(--muted)}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap}
+    .tab{background:#0e1627;border:1px solid #1e2a44;border-radius:10px;padding:8px 10px;cursor:pointer}
+    .tab.active{background:var(--panel);border-color:#2f3f66}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .card{background:var(--panel);border:1px solid #2b3a57;border-radius:14px;overflow:hidden}
+    .card h3{margin:0;padding:12px 14px;border-bottom:1px solid #2b3a57;font-size:16px}
+    .card .content{padding:14px}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    input,select,textarea{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #324467;background:#0e1627;color:var(--text)}
+    textarea{min-height:80px;resize:vertical}
+    .row{display:flex;gap:10px;align-items:center}
+    .row > *{flex:1}
+    .btn{padding:10px 12px;border-radius:10px;border:1px solid #2b3a57;background:#13203a;color:var(--text);cursor:pointer}
+    .btn:hover{filter:brightness(1.1)}
+    .btn.primary{background:linear-gradient(180deg,#1d4ed8,#1e40af);border-color:#1d4ed8}
+    .btn.success{background:linear-gradient(180deg,#059669,#047857);border-color:#059669}
+    .btn.warn{background:linear-gradient(180deg,#d97706,#b45309);border-color:#d97706}
+    .btn.danger{background:linear-gradient(180deg,#dc2626,#b91c1c);border-color:#dc2626}
+    .list{display:flex;flex-direction:column;gap:10px}
+    .item{border:1px solid #2b3a57;border-radius:12px;padding:10px;background:#0e1627}
+    .item .top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .pill{padding:4px 8px;border-radius:999px;font-size:12px;border:1px solid #2b3a57}
+    .pill.red{background:#2b1212;border-color:#5f2222;color:#fecaca}
+    .pill.orange{background:#2b1c0e;border-color:#6b3a1a;color:#ffedd5}
+    .pill.green{background:#0e2b1b;border-color:#1d5d3d;color:#d1fae5}
+    .muted{color:var(--muted);font-size:12px}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .divider{height:1px;background:#2b3a57;margin:10px 0}
+    .right{display:flex;gap:8px;flex-wrap:wrap}
+    .empty{color:var(--muted);text-align:center;padding:20px;border:1px dashed #324467;border-radius:12px}
+    .footer{margin-top:10px;color:var(--muted);font-size:12px}
+    .hint{font-size:12px;color:var(--muted)}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    .twocol{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="row" style="gap:10px">
+        <h1 style="margin:0;font-size:18px">🚑 Alerte SAMU – Mini Système</h1>
+        <span class="badge">Gratuit · GitHub Pages + Firebase (Spark)</span>
+      </div>
+      <div class="row" style="gap:8px;justify-content:flex-end">
+        <select id="roleSelect" title="Rôle">
+          <option value="reg">Régulation</option>
+          <option value="team">Équipe</option>
+        </select>
+        <select id="teamSelect" title="Équipe (côté Équipe)">
+          <option value="SMUR 1">SMUR 1</option>
+          <option value="SMUR 2">SMUR 2</option>
+          <option value="SMUR Secondaire">SMUR Secondaire</option>
+          <option value="Ambulance 1">Ambulance 1</option>
+          <option value="Ambulance 2">Ambulance 2</option>
+        </select>
+      </div>
+    </header>
+
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="reg">🛎️ Régulation</button>
+      <button class="tab" data-tab="team">📱 Équipe</button>
+      <button class="tab" data-tab="help">❓ Aide</button>
+    </div>
+
+    <!-- REGULATION VIEW -->
+    <section id="tab-reg" class="tabpane" aria-labelledby="Régulation" style="margin-top:12px">
+      <div class="grid">
+        <div class="card">
+          <h3>Créer une mission</h3>
+          <div class="content">
+            <div class="twocol">
+              <div>
+                <label>Intitulé</label>
+                <input id="m-title" placeholder="Ex. Détresse respiratoire" />
+              </div>
+              <div>
+                <label>Priorité</label>
+                <select id="m-prio">
+                  <option value="1">🔴 1 – Urgent absolu</option>
+                  <option value="2">🟠 2 – Urgent</option>
+                  <option value="3" selected>🟢 3 – Standard</option>
+                </select>
+              </div>
+            </div>
+            <div class="twocol" style="margin-top:10px">
+              <div>
+                <label>Adresse</label>
+                <input id="m-addr" placeholder="Adresse/lieu" />
+              </div>
+              <div>
+                <label>Équipe assignée</label>
+                <select id="m-team">
+                  <option value="SMUR 1">SMUR 1</option>
+                  <option value="SMUR 2">SMUR 2</option>
+                  <option value="SMUR Secondaire">SMUR Secondaire</option>
+                  <option value="Ambulance 1">Ambulance 1</option>
+                  <option value="Ambulance 2">Ambulance 2</option>
+                </select>
+              </div>
+            </div>
+            <div style="margin-top:10px">
+              <label>Détails</label>
+              <textarea id="m-notes" placeholder="Consignes, téléphone, accès, etc."></textarea>
+            </div>
+            <div class="row" style="margin-top:12px;justify-content:flex-end">
+              <button class="btn" id="btn-draft">💾 Enregistrer (brouillon)</button>
+              <button class="btn primary" id="btn-alert">🚨 Envoyer l'alerte</button>
+            </div>
+            <p class="hint" style="margin-top:8px">Les missions sont enregistrées en temps réel. Cliquer sur "Envoyer l'alerte" notifie l'équipe assignée (vue Équipe).</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>File de missions</h3>
+          <div class="content">
+            <div id="missions" class="list"></div>
+            <div id="missions-empty" class="empty" style="display:none">Aucune mission pour le moment.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TEAM VIEW -->
+    <section id="tab-team" class="tabpane" hidden>
+      <div class="grid">
+        <div class="card">
+          <h3>Alertes reçues (<span id="teamNameLabel">SMUR 1</span>)</h3>
+          <div class="content">
+            <div id="alerts" class="list"></div>
+            <div id="alerts-empty" class="empty" style="display:none">Pas d'alerte. L'écran se met à jour automatiquement.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Statut rapide</h3>
+          <div class="content">
+            <div class="row">
+              <button class="btn success" data-quick-status="EN_ROUTE">En route</button>
+              <button class="btn warn" data-quick-status="SUR_PLACE">Sur place</button>
+              <button class="btn" data-quick-status="TRANSPORT">Transport</button>
+              <button class="btn" data-quick-status="DISPONIBLE">Disponible</button>
+            </div>
+            <p class="hint" style="margin-top:8px">Le statut rapide s'applique à la dernière mission active de votre équipe.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HELP VIEW -->
+    <section id="tab-help" class="tabpane" hidden>
+      <div class="card">
+        <h3>Déploiement 100% gratuit</h3>
+        <div class="content">
+          <ol>
+            <li>Crée un projet Firebase (plan Spark gratuit) → active <b>Authentication</b> (anonyme) et <b>Realtime Database</b> en mode sécurisé (règles ci-dessous).</li>
+            <li>Dans ⚙️ Paramètres → Configuration du SDK Web, copie ta configuration dans la section <span class="mono">FIREBASE_CONFIG</span> ci-dessous.</li>
+            <li>Publie ce fichier sur GitHub (branche <span class="mono">main</span>) et active GitHub Pages (root).</li>
+            <li>Ouvre l'URL GitHub Pages sur tes 5 PC/smartphones : la synchro est instantanée.</li>
+          </ol>
+          <div class="divider"></div>
+          <p><b>Règles Realtime Database conseillées (minimum fonctionnel)</b></p>
+          <pre class="mono" style="white-space:pre-wrap;background:#0e1627;padding:10px;border-radius:10px;border:1px solid #2b3a57">{
+  "rules": {
+    ".read": true,
+    ".write": true,
+    "missions": {
+      ".indexOn": ["team","status","createdAt"]
+    },
+    "alerts": {
+      ".indexOn": ["team","createdAt","status"]
+    }
+  }
+}
+</pre>
+          <p class="hint">Ces règles ouvertes sont idéales pour un test en interne. Pour plus de sécurité, restreins par IP ou ajoute un <i>secret PIN</i> de régulation (cf. constante <span class="mono">REG_PIN</span> ci-dessous) et des règles basées sur le champ <span class="mono">role</span> si tu souhaites.</p>
+        </div>
+      </div>
+    </section>
+
+    <p class="footer">© 2025 – Mini app pédagogique. Aucune donnée de santé. Adapté au SAMU / CRRA pour tests internes.</p>
+  </div>
+
+  <!-- ===================== FIREBASE + APP ===================== -->
+  <script type="module">
+    // ======= CONFIGURATION À REMPLIR =======
+    const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAi0YZBqDaVngJRILRDwF9FXNdrUkw8UBs",
+  authDomain: "samu-alerte.firebaseapp.com",
+  databaseURL: "https://samu-alerte-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "samu-alerte",
+  storageBucket: "samu-alerte.appspot.com",
+  messagingSenderId: "636814603515",
+  appId: "1:636814603515:web:340fab037735debed32c5e",
+  measurementId: "G-9LC4YGNJR0"
+
+};
+    // (Optionnel) PIN de régulation à demander pour l'envoi d'une alerte
+    const REG_PIN = "0000"; // mets un code simple à partager uniquement aux régulateurs
+
+    // Équipes disponibles (tu peux modifier la liste)
+    const TEAMS = ["SMUR 1","SMUR 2","SMUR Secondaire","Ambulance 1","Ambulance 2"];
+
+    // ======= IMPORT SDK FIREBASE (v9 modules) =======
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, push, set, onValue, query, orderByChild, equalTo, update, serverTimestamp, limitToLast } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    // ======= INIT =======
+    const app = initializeApp(FIREBASE_CONFIG);
+    const db = getDatabase(app);
+    const auth = getAuth(app);
+    await signInAnonymously(auth).catch(console.error);
+
+    // ======= UI HELPERS =======
+    const $ = (sel)=>document.querySelector(sel);
+    const el = (tag, props={}, children=[])=>{
+      const e=document.createElement(tag);Object.assign(e,props);children.forEach(c=>e.append(c));return e;
+    }
+    const fmtTime = (ts)=>{
+      const d = new Date(ts || Date.now());
+      return d.toLocaleString();
+    }
+    const prioTag = (p)=> p=="1"?"red":(p==="2"?"orange":"green");
+
+    // ======= TABS / ROLE =======
+    const tabBtns = document.querySelectorAll('.tab');
+    tabBtns.forEach(b=>b.addEventListener('click',()=>{
+      tabBtns.forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      document.querySelectorAll('.tabpane').forEach(p=>p.hidden=true);
+      $('#tab-'+b.dataset.tab).hidden=false;
+      if(b.dataset.tab==='team') $('#roleSelect').value='team';
+      if(b.dataset.tab==='reg') $('#roleSelect').value='reg';
+    }));
+    $('#roleSelect').addEventListener('change', e=>{
+      const v=e.target.value; document.querySelector(`[data-tab="${v}"]`).click();
+    });
+
+    // Keep team select in sync
+    const teamSelect = $('#teamSelect');
+    const teamNameLabel = $('#teamNameLabel');
+    TEAMS.forEach(t=>{ if(![...teamSelect.options].some(o=>o.value===t)){ teamSelect.append(el('option',{value:t, textContent:t})) } });
+    teamSelect.addEventListener('change',()=> teamNameLabel.textContent = teamSelect.value);
+
+    // ======= REG – CREATE MISSION =======
+    const mTitle=$('#m-title'), mPrio=$('#m-prio'), mAddr=$('#m-addr'), mTeam=$('#m-team'), mNotes=$('#m-notes');
+    const btnDraft=$('#btn-draft'), btnAlert=$('#btn-alert');
+
+    const readMissionForm = ()=>({
+      title: mTitle.value.trim(),
+      prio: mPrio.value,
+      addr: mAddr.value.trim(),
+      team: mTeam.value,
+      notes: mNotes.value.trim(),
+      status: "BROUILLON",
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    });
+
+    btnDraft.addEventListener('click', async()=>{
+      const data = readMissionForm();
+      if(!data.title){alert('Intitulé requis'); return}
+      const r = push(ref(db,'missions'));
+      await set(r, data);
+      alert('Brouillon enregistré');
+      clearForm();
+    });
+
+    btnAlert.addEventListener('click', async()=>{
+      const data = readMissionForm();
+      if(!data.title){alert('Intitulé requis'); return}
+      const pin = prompt('PIN régulation ? (ou laisse vide si non configuré)');
+      if(pin!==null && pin!==REG_PIN){ alert('PIN incorrect'); return }
+
+      // 1) Crée la mission (statut = ENVOYEE)
+      data.status = 'ENVOYEE';
+      const missionRef = push(ref(db,'missions'));
+      await set(missionRef, data);
+
+      // 2) Pousse une alerte liée
+      const alertRef = push(ref(db,'alerts'));
+      await set(alertRef, {
+        missionId: missionRef.key,
+        team: data.team,
+        title: data.title,
+        addr: data.addr,
+        prio: data.prio,
+        notes: data.notes,
+        status: 'NOUVELLE', // NOUVELLE → ACCUSEE → EN_COURS → TERMINEE (côté régulation)
+        createdAt: Date.now(),
+        ackAt: null,
+        lastStatusAt: Date.now()
+      });
+
+      alert('🚨 Alerte envoyée à '+data.team);
+      clearForm();
+    });
+
+    function clearForm(){ mTitle.value=''; mAddr.value=''; mNotes.value=''; mPrio.value='3'; }
+
+    // ======= REG – MISSIONS LISTEN =======
+    const missionsEl = $('#missions');
+    const missionsEmpty = $('#missions-empty');
+
+    function renderMission(id, m){
+      const pillClass = m.prio==='1'?'pill red':(m.prio==='2'?'pill orange':'pill green');
+      const box = el('div',{className:'item'});
+      const header = el('div',{className:'top'},[
+        el('div',{},[
+          el('strong',{textContent:m.title+" "}),
+          el('span',{className:'pill '+prioTag(m.prio),textContent:'P'+m.prio}),
+          el('span',{className:'muted',style:'margin-left:8px',textContent:m.team+' · '+fmtTime(m.createdAt)})
+        ]),
+        el('div',{className:'right'},[
+          el('button',{className:'btn', textContent:'Disponible', onclick:()=> setStatus(id,'DISPONIBLE')}),
+          el('button',{className:'btn warn', textContent:'En cours', onclick:()=> setStatus(id,'EN_COURS')}),
+          el('button',{className:'btn success', textContent:'Terminé', onclick:()=> setStatus(id,'TERMINE')}),
+          el('button',{className:'btn danger', textContent:'Supprimer', onclick:()=> delMission(id)})
+        ])
+      ]);
+      const body = el('div',{},[
+        el('div',{className:'muted',textContent:m.addr||'— adresse —'}),
+        el('div',{className:'muted',style:'margin-top:6px',textContent:m.notes||'—'}),
+      ]);
+      box.append(header, el('div',{className:'divider'}), body);
+      return box;
+    }
+
+    async function setStatus(id, status){
+      await update(ref(db,'missions/'+id), { status, updatedAt: Date.now() });
+    }
+    async function delMission(id){
+      if(confirm('Supprimer cette mission ?')){
+        await set(ref(db,'missions/'+id), null);
+      }
+    }
+
+    onValue(query(ref(db,'missions'), orderByChild('createdAt')), (snap)=>{
+      missionsEl.innerHTML='';
+      const list = [];
+      snap.forEach(child=> list.push({id:child.key, ...child.val()}));
+      list.sort((a,b)=>b.createdAt-a.createdAt);
+      list.forEach(m=> missionsEl.append(renderMission(m.id,m)));
+      missionsEmpty.style.display = list.length? 'none':'block';
+    });
+
+    // ======= TEAM – ALERTS LISTEN =======
+    const alertsEl = $('#alerts');
+    const alertsEmpty = $('#alerts-empty');
+
+    function renderAlert(id, a){
+      const box = el('div',{className:'item'});
+      const header = el('div',{className:'top'},[
+        el('div',{},[
+          el('strong',{textContent:a.title+" "}),
+          el('span',{className:'pill '+prioTag(a.prio),textContent:'P'+a.prio}),
+          el('span',{className:'muted',style:'margin-left:8px',textContent:fmtTime(a.createdAt)})
+        ]),
+        el('div',{className:'right'},[
+          el('button',{className:'btn success', textContent:'Accuser', onclick:()=> ackAlert(id)}),
+          el('button',{className:'btn warn', textContent:'En cours', onclick:()=> setAlertStatus(id,'EN_COURS')}),
+          el('button',{className:'btn', textContent:'Terminer', onclick:()=> setAlertStatus(id,'TERMINEE')})
+        ])
+      ]);
+      const body = el('div',{},[
+        el('div',{className:'muted',textContent:a.addr||'— adresse —'}),
+        el('div',{className:'muted',style:'margin-top:6px',textContent:a.notes||'—'}),
+        el('div',{className:'muted',style:'margin-top:6px',textContent:'Équipe : '+a.team}),
+        a.ackAt? el('div',{className:'muted',style:'margin-top:6px',textContent:'Accusé à '+fmtTime(a.ackAt)}):null
+      ].filter(Boolean));
+      box.append(header, el('div',{className:'divider'}), body);
+      return box;
+    }
+
+    async function ackAlert(id){
+      await update(ref(db,'alerts/'+id), { status:'ACCUSEE', ackAt: Date.now(), lastStatusAt: Date.now() });
+    }
+    async function setAlertStatus(id, status){
+      await update(ref(db,'alerts/'+id), { status, lastStatusAt: Date.now() });
+    }
+
+    function listenAlertsFor(team){
+      const q = query(ref(db,'alerts'));
+      onValue(q, (snap)=>{
+        alertsEl.innerHTML='';
+        const list=[]; snap.forEach(c=>{ const v=c.val(); if(v.team===team) list.push({id:c.key, ...v}); });
+        list.sort((a,b)=> b.createdAt-a.createdAt);
+        list.forEach(a=> alertsEl.append(renderAlert(a.id,a)));
+        alertsEmpty.style.display = list.length? 'none':'block';
+      });
+    }
+
+    listenAlertsFor(teamSelect.value);
+    teamSelect.addEventListener('change',()=> listenAlertsFor(teamSelect.value));
+
+    // ======= TEAM – QUICK STATUS =======
+    document.querySelectorAll('[data-quick-status]').forEach(btn=>{
+      btn.addEventListener('click', async()=>{
+        const status = btn.dataset.quickStatus;
+        // Cherche la dernière alerte pour cette équipe qui n'est pas TERMINEE
+        const team = teamSelect.value;
+        const snap = await new Promise(res=> onValue(query(ref(db,'alerts')), res, { onlyOnce:true }));
+        const arr=[]; snap.forEach(c=>{ const v=c.val(); if(v.team===team && v.status!=='TERMINEE') arr.push({id:c.key, ...v}); });
+        arr.sort((a,b)=> b.createdAt-a.createdAt);
+        if(!arr.length){ alert('Aucune mission active'); return }
+        await setAlertStatus(arr[0].id, status);
+      });
+    });
+
+    // ======= URL PARAMS → rôle direct =======
+    const urlParams = new URLSearchParams(location.search);
+    const role = urlParams.get('role');
+    if(role==='team'){ document.querySelector('[data-tab="team"]').click(); }
+
+  </script>
+</body>
+</html>
